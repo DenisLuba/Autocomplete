@@ -20,18 +20,26 @@ internal class AutocompleteTask
         if (index < phrases.Count && phrases[index].StartsWith(prefix, StringComparison.InvariantCultureIgnoreCase))
             return phrases[index];
 
-        return null;
+        return "";
     }
 
     /// <returns>
     /// Возвращает первые в лексикографическом порядке count (или меньше, если их меньше count) 
     /// элементов словаря, начинающихся с prefix.
     /// </returns>
-    /// <remarks>Эта функция должна работать за O(log(n) + count)</remarks>
+    /// <remarks>Эта функция работает за O(log(n) + count)</remarks>
     public static string[] GetTopByPrefix(IReadOnlyList<string> phrases, string prefix, int count)
     {
-        // тут стоит использовать написанный ранее класс LeftBorderTask
-        return null;
+        if (phrases.Count == 0) return Array.Empty<string>();
+        var leftIndex = LeftBorderTask.GetLeftBorderIndex(phrases, prefix, -1, phrases.Count) + 1;
+        var countByPrefix = GetCountByPrefix(phrases, prefix);
+        if (countByPrefix == 0) return Array.Empty<string>();
+        count = countByPrefix < count ? countByPrefix : count;
+        var result = new string[count];
+        for (int i = leftIndex, j = 0; i < leftIndex + count; i++, j++)
+            result[j] = phrases[i];
+
+        return result;
     }
 
     /// <returns>
@@ -39,28 +47,47 @@ internal class AutocompleteTask
     /// </returns>
     public static int GetCountByPrefix(IReadOnlyList<string> phrases, string prefix)
     {
-        // тут стоит использовать написанные ранее классы LeftBorderTask и RightBorderTask
-        return -1;
+        if (phrases.Count == 0) return 0;
+        var leftIndex = LeftBorderTask.GetLeftBorderIndex(phrases, prefix, -1, phrases.Count) + 1;
+        var rightIndex = RightBorderTask.GetRightBorderIndex(phrases, prefix, -1, phrases.Count) - 1;
+
+        if (leftIndex < phrases.Count
+            && phrases[leftIndex].StartsWith(prefix, StringComparison.InvariantCultureIgnoreCase)
+            && leftIndex <= rightIndex)
+            return rightIndex - leftIndex + 1;
+
+        return 0;
     }
 }
 
 [TestFixture]
 public class AutocompleteTests
 {
-    [Test]
-    public void TopByPrefix_IsEmpty_WhenNoPhrases()
+    [TestCase(new string[] { "aa", "ab", "ac", "bc" }, "a", 2, new string[] { "aa", "ab" })]
+
+    [TestCase(new string[] { }, "ab", 6, new string[0])]
+    [TestCase(new[] { "aa", "ab", "bb", "bb", "c" }, "b", 6, new[] { "bb", "bb" })]
+    [TestCase(new[] { "aa", "ab", "bb", "bb", "bb" }, "a", 10, new[] { "aa", "ab" })]
+    [TestCase(new[] { "aa", "ab", "bb", "bb", "bb", "c" }, "c", 6, new[] { "c" })]
+    [TestCase(new[] { "aa", "ab", "bb", "bb", "bb", "c" }, "", 3, new[] { "aa", "ab", "bb" })]
+    public void TopByPrefix_IsEmpty_WhenNoPhrases(IReadOnlyList<string> phrases, string prefix, int count, string[] expected)
     {
-        // ...
+        var actualTopWords = AutocompleteTask.GetTopByPrefix(phrases, prefix, count);
+        Assert.AreEqual(expected, actualTopWords);
         //CollectionAssert.IsEmpty(actualTopWords);
     }
 
     // ...
 
-    [Test]
-    public void CountByPrefix_IsTotalCount_WhenEmptyPrefix()
+    [TestCase(new string[] { }, "ab", 0)]
+    [TestCase(new[] { "aa", "ab", "bb", "bb", "bb", "bb", "bb", "bb", "bb", "bb", "c" }, "b", 8)]
+    [TestCase(new[] { "aa", "ab", "bb", "bb", "bb", "bb", "bb", "bb", "bb", "bb", "c" }, "a", 2)]
+    [TestCase(new[] { "aa", "ab", "bb", "bb", "bb", "bb", "bb", "bb", "bb", "bb", "c" }, "c", 1)]
+    [TestCase(new[] { "aa", "ab", "bb", "bb", "bb", "bb", "bb", "bb", "bb", "bb", "c" }, "", 11)]
+    public void CountByPrefix_IsTotalCount_WhenEmptyPrefix(IReadOnlyList<string> phrases, string prefix, int expected)
     {
-        // ...
-        //Assert.AreEqual(expectedCount, actualCount);
+        var actualCount = AutocompleteTask.GetCountByPrefix(phrases, prefix);
+        Assert.AreEqual(expected, actualCount);
     }
 
     // ...
